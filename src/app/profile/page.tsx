@@ -1,0 +1,53 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { updateProfile, updateVolunteerLocation } from '@/lib/actions';
+
+export default async function ProfilePage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data: volunteer } = await supabase.from('volunteers').select('*').eq('id', user.id).single();
+  const role = (profile as { role: string } | null)?.role ?? 'donor';
+  const inputCls = 'mt-1.5 w-full rounded-2xl border bg-white px-3.5 py-2.5 text-sm shadow-soft focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-white/10 dark:bg-slate-800 dark:text-white';
+  return (
+    <div className="mx-auto max-w-xl space-y-6">
+      <div className="overflow-hidden rounded-[28px] border bg-white shadow-card dark:border-white/10 dark:bg-slate-900/70">
+        <div className="h-1 bg-gradient-to-r from-brand-600 to-emerald-600" />
+        <div className="p-6">
+          <h1 className="font-display text-2xl font-extrabold tracking-tight dark:text-white">Profile</h1>
+          <div className="mt-4 grid gap-2 rounded-2xl bg-slate-50 p-4 text-sm dark:bg-white/5">
+            <div className="dark:text-slate-200"><span className="font-bold">Email:</span> {user.email}</div>
+            <div className="dark:text-slate-200"><span className="font-bold">Role:</span> <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-white dark:bg-white dark:text-slate-900">{role}</span></div>
+            <div className="break-all dark:text-slate-300"><span className="font-bold">User ID:</span> <code className="rounded bg-white px-1.5 py-0.5 text-xs dark:bg-slate-800 dark:text-slate-200">{user.id}</code></div>
+          </div>
+        </div>
+      </div>
+      <form action={async (fd: FormData) => { 'use server'; await updateProfile(fd); }} className="rounded-[24px] border bg-white p-6 shadow-soft space-y-4 dark:border-white/10 dark:bg-slate-900/60">
+        <h2 className="font-display font-extrabold dark:text-white">Edit profile</h2>
+        <label className="block"><span className="text-sm font-bold dark:text-slate-200">Full name</span><input name="full_name" defaultValue={(profile as { full_name: string })?.full_name ?? ''} className={inputCls} /></label>
+        <label className="block"><span className="text-sm font-bold dark:text-slate-200">Phone</span><input name="phone" defaultValue={(profile as { phone: string | null })?.phone ?? ''} className={inputCls} /></label>
+        <label className="block"><span className="text-sm font-bold dark:text-slate-200">City</span><input name="city" defaultValue={(profile as { city: string | null })?.city ?? ''} className={inputCls} /></label>
+        {role === 'volunteer' && (
+          <label className="block"><span className="text-sm font-bold dark:text-slate-200">Vehicle</span>
+            <select name="vehicle_type" defaultValue={(volunteer as { vehicle_type: string } | null)?.vehicle_type ?? 'none'} className={inputCls}>
+              <option value="none">None (on foot)</option><option value="cycle">Cycle</option><option value="bike">Bike</option><option value="car">Car</option>
+            </select>
+          </label>
+        )}
+        <button className="rounded-full bg-slate-900 px-6 py-2.5 font-extrabold text-white shadow-soft hover:bg-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100">Save</button>
+      </form>
+      {role === 'volunteer' && (
+        <form action={async (fd: FormData) => { 'use server'; const lat = Number(fd.get('lat')); const lng = Number(fd.get('lng')); await updateVolunteerLocation(lat, lng); }} className="rounded-[24px] border bg-white p-6 shadow-soft space-y-3 dark:border-white/10 dark:bg-slate-900/60">
+          <h2 className="font-display font-extrabold dark:text-white">Update live location</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Used for Haversine nearest-volunteer matching. No paid map API needed.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block"><span className="text-sm font-bold dark:text-slate-200">Lat</span><input name="lat" type="number" step="0.000001" defaultValue={(volunteer as { current_lat: number | null } | null)?.current_lat ?? ''} className={inputCls} /></label>
+            <label className="block"><span className="text-sm font-bold dark:text-slate-200">Lng</span><input name="lng" type="number" step="0.000001" defaultValue={(volunteer as { current_lng: number | null } | null)?.current_lng ?? ''} className={inputCls} /></label>
+          </div>
+          <button className="rounded-full border bg-white px-6 py-2.5 font-bold shadow-soft hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">Update location</button>
+        </form>
+      )}
+    </div>
+  );
+}

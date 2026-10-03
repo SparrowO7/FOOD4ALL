@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --bg: #f8fafc; }
+html, body { height: 100%; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--bg); }
+
+/* premium premium */
+.glass { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* subtle noise for premium feel - light */
+.premium-bg {
+  background:
+    radial-gradient(at 16% 14%, rgba(34,197,94,.10) 0, transparent 52%),
+    radial-gradient(at 92% 10%, rgba(251,146,60,.08) 0, transparent 42%),
+    radial-gradient(at 50% 86%, rgba(14,165,233,.07) 0, transparent 48%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+.dark .premium-bg {
+  background:
+    radial-gradient(at 16% 14%, rgba(34,197,94,.16) 0, transparent 52%),
+    radial-gradient(at 92% 10%, rgba(251,146,60,.13) 0, transparent 42%),
+    radial-gradient(at 50% 86%, rgba(56,189,248,.10) 0, transparent 48%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 55%, #0b1220 100%);
+}
+html.dark { color-scheme: dark; }
+
+/* ---------------------------------------------------------------------------
+   Leaflet overrides (MapPicker / LocationMap)
+
+   Leaflet ships its own stylesheet with hard-coded light-theme colours and a
+   serif-ish default font. These four rules make it look like the rest of the
+   app instead of an embedded widget from another website.
+--------------------------------------------------------------------------- */
+
+/* Leaflet's default is 12px/1.5 "Helvetica Neue" — inherit ours instead. */
+.leaflet-container { font: inherit; }
+
+/* The grey shown while tiles load. Pure #ddd flashes bright in dark mode. */
+.leaflet-container { background: #e2e8f0; }
+.dark .leaflet-container { background: #1e293b; }
+
+/* Attribution is required by OSM's tile policy, so it stays — but it does not
+   need to shout. Readable, small, and theme-aware. */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, .78) !important;
+  font-size: 10px !important;
+}
+.dark .leaflet-control-attribution {
+  background: rgba(15, 23, 42, .78) !important;
+  color: #cbd5e1 !important;
+}
+.dark .leaflet-control-attribution a { color: #7dd3fc !important; }
+
+/* Zoom buttons: match the app's rounded, soft-shadow language. */
+.dark .leaflet-bar a {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-bottom-color: rgba(255, 255, 255, .12);
+}
+.dark .leaflet-bar a:hover { background: #334155; }

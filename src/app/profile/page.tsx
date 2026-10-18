@@ -1,6 +1,8 @@
+import SaveForm from '@/components/SaveForm';
+import PageIntro from '@/components/PageIntro';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { updateProfile, updateVolunteerLocation } from '@/lib/actions';
+import { updateProfile, updateVolunteerLocation, updateNgoProfile } from '@/lib/actions';
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -9,9 +11,10 @@ export default async function ProfilePage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   const { data: volunteer } = await supabase.from('volunteers').select('*').eq('id', user.id).single();
   const role = (profile as { role: string } | null)?.role ?? 'donor';
+  const {data:ngo}=role==='ngo'?await supabase.from('ngos').select('*').eq('id',user.id).single():{data:null};
   const inputCls = 'mt-1.5 w-full rounded-2xl border bg-white px-3.5 py-2.5 text-sm shadow-soft focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-white/10 dark:bg-slate-800 dark:text-white';
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="workspace-page mx-auto max-w-3xl space-y-6"><PageIntro eyebrow="YOUR COMMUNITY PROFILE" title="A little about you." description="Keep your contact and pickup information up to date." />
       <div className="overflow-hidden rounded-[28px] border bg-white shadow-card dark:border-white/10 dark:bg-slate-900/70">
         <div className="h-1 bg-gradient-to-r from-brand-600 to-emerald-600" />
         <div className="p-6">
@@ -23,7 +26,7 @@ export default async function ProfilePage() {
           </div>
         </div>
       </div>
-      <form action={async (fd: FormData) => { 'use server'; await updateProfile(fd); }} className="rounded-[24px] border bg-white p-6 shadow-soft space-y-4 dark:border-white/10 dark:bg-slate-900/60">
+      <SaveForm action={updateProfile} className="rounded-[24px] border bg-white p-6 shadow-soft space-y-4 dark:border-white/10 dark:bg-slate-900/60">
         <h2 className="font-display font-extrabold dark:text-white">Edit profile</h2>
         <label className="block"><span className="text-sm font-bold dark:text-slate-200">Full name</span><input name="full_name" defaultValue={(profile as { full_name: string })?.full_name ?? ''} className={inputCls} /></label>
         <label className="block"><span className="text-sm font-bold dark:text-slate-200">Phone</span><input name="phone" defaultValue={(profile as { phone: string | null })?.phone ?? ''} className={inputCls} /></label>
@@ -35,19 +38,18 @@ export default async function ProfilePage() {
             </select>
           </label>
         )}
-        <button className="rounded-full bg-slate-900 px-6 py-2.5 font-extrabold text-white shadow-soft hover:bg-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100">Save</button>
-      </form>
+      </SaveForm>
       {role === 'volunteer' && (
-        <form action={async (fd: FormData) => { 'use server'; const lat = Number(fd.get('lat')); const lng = Number(fd.get('lng')); await updateVolunteerLocation(lat, lng); }} className="rounded-[24px] border bg-white p-6 shadow-soft space-y-3 dark:border-white/10 dark:bg-slate-900/60">
+        <SaveForm action={async (fd:FormData)=>{'use server';if(!String(fd.get('lat')??'').trim()||!String(fd.get('lng')??'').trim())return {error:'Enter both coordinates.'};return updateVolunteerLocation(Number(fd.get('lat')),Number(fd.get('lng')));}} className="rounded-[24px] border bg-white p-6 shadow-soft space-y-3 dark:border-white/10 dark:bg-slate-900/60">
           <h2 className="font-display font-extrabold dark:text-white">Update live location</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Used for Haversine nearest-volunteer matching. No paid map API needed.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Set your pickup starting point. Your exact location is kept private.</p>
           <div className="grid grid-cols-2 gap-3">
             <label className="block"><span className="text-sm font-bold dark:text-slate-200">Lat</span><input name="lat" type="number" step="0.000001" defaultValue={(volunteer as { current_lat: number | null } | null)?.current_lat ?? ''} className={inputCls} /></label>
             <label className="block"><span className="text-sm font-bold dark:text-slate-200">Lng</span><input name="lng" type="number" step="0.000001" defaultValue={(volunteer as { current_lng: number | null } | null)?.current_lng ?? ''} className={inputCls} /></label>
           </div>
-          <button className="rounded-full border bg-white px-6 py-2.5 font-bold shadow-soft hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">Update location</button>
-        </form>
+        </SaveForm>
       )}
+      {role==='ngo'&&<SaveForm action={updateNgoProfile}><h2 className="section-title">Your organisation</h2><p className="text-sm text-slate-500">These details help an administrator review your organisation before you claim food.</p>{[{key:'org_name',label:'Organisation name',required:true},{key:'contact_person',label:'Contact person',required:true},{key:'contact_phone',label:'Contact phone',required:true},{key:'address',label:'Organisation address',required:true},{key:'registration_no',label:'Registration number'},{key:'fssai_licence_no',label:'Food licence number, if applicable'},{key:'licence_not_required_note',label:'If not applicable, explain why'}].map(f=><label className="block" key={f.key}><span className="text-sm font-semibold">{f.label}</span><input className={inputCls} name={f.key} required={f.required} defaultValue={ngo?.[f.key]??''}/></label>)}</SaveForm>}
     </div>
   );
 }

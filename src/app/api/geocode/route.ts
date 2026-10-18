@@ -31,7 +31,7 @@ const NOMINATIM = 'https://nominatim.openstreetmap.org';
 
 // Nominatim asks for a real contact point. Put your deployed URL here.
 const USER_AGENT =
-  'Food4All/0.1 (nonprofit food-rescue project; +https://github.com/food4all)';
+  'Food4All India/0.1 (nonprofit food-rescue project; +https://github.com/food4all)';
 
 /** Nominatim's policy limit, plus 100ms of headroom for clock jitter. */
 const MIN_GAP_MS = 1100;

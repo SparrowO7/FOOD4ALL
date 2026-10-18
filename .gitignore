@@ -23,3 +23,18 @@ next-env.d.ts
 
 # build artifacts
 tsconfig.tsbuildinfo
+
+# Android local build state
+mobile/dist/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/**/build/
+mobile/android/capacitor-cordova-android-plugins/
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor*.json
+mobile/.tools/
+*.jks
+*.keystore
+
+# Downloadable Android packages are published as GitHub release assets.
+artifacts/*.apk

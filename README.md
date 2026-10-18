@@ -1,9 +1,20 @@
-# Food4All
+# Food4All India
 
-A nonprofit, volunteer-driven food-rescue platform for India. A restaurant with
-surplus food publishes it; a verified NGO claims it; a volunteer picks it up and
-delivers it. Every handoff is recorded, and every state change is enforced by
-the database rather than by trust.
+A vegetarian food-rescue platform connecting lawns and food donors in India
+with verified NGOs. Donors publish packed surplus food with a QR label;
+NGOs claim, collect directly and record actual distribution. Every handoff
+is recorded and protected by database rules.
+
+**Android pilot v0.2.0:** [Download Food4All India APK](https://github.com/SparrowO7/FOOD4ALL/releases/download/v0.2.0/Food4All-India-Pilot-0.2.0.apk)
+([release notes](https://github.com/SparrowO7/FOOD4ALL/releases/tag/v0.2.0)).
+Android 8.0+ and internet are required. This is a debug-signed pilot;
+physical-phone camera/printed-label/printer field checks remain pending.
+
+The app includes Lawn / donor, NGO and assigned Admin login, private food
+photos, QR labels/scanning, direct NGO collection/distribution, reports and
+NGO verification. Admin signup is not public. See the [Android source and
+rebuild guide](mobile/README.md), [installation guide](artifacts/INSTALL.md)
+and [verification results](mobile/VERIFICATION.md).
 
 Built as a final-year project on entirely free infrastructure — **₹0/month** at
 demo scale, with no paid map, geocoding, or notification APIs.
@@ -17,15 +28,15 @@ demo scale, with no paid map, geocoding, or notification APIs.
 A donation moves through a strict lifecycle:
 
 ```
-draft → available → claimed → pickup_scheduled → picked_up → delivered → completed
-                                                            ↘ cancelled / expired
+draft → available → claimed → picked_up → delivered → completed
+                           ↘ cancelled / expired / rejected (as permitted)
 ```
 
 That lifecycle is not enforced by an API layer that could be bypassed. It is
 enforced in Postgres, twice:
 
-1. **One guarded `SECURITY DEFINER` RPC** — `transition_donation()` is the only
-   write path for `status`. It checks the caller's role against the requested
+1. **Guarded `SECURITY DEFINER` RPCs** — `transition_donation()`, `ngo_collect()`
+   and `ngo_distribute()` control lifecycle changes. They check the caller's role against the requested
    transition, takes a `for update` row lock (so two NGOs cannot claim the same
    donation in the same millisecond), re-checks food freshness, applies side
    effects, and writes an audit row — all in one transaction.
@@ -35,10 +46,16 @@ enforced in Postgres, twice:
 The RPC is a door; the trigger is a wall. You need both, because a door can be
 walked around.
 
-Row-Level Security then decides *rows*, not transitions: a signed-out visitor
-sees only `available` donations, with the street address nulled and coordinates
-rounded to two decimal places (~1.1 km of deliberate fuzz). The exact address
-appears only once an NGO has claimed it or a volunteer has been assigned.
+`ngo_distribute()` records servings, reported people reached and the distribution
+area atomically with completion. Repeated completion is rejected. One QR
+identifies one batch; scanning alone never marks food served. Older assigned
+volunteer handovers remain supported through the website.
+
+Row-Level Security then decides *rows*, not transitions. Signed-in discovery
+masks street addresses and rounds coordinates to two decimal places. A
+claiming NGO sees exact pickup details; unrelated accounts cannot read raw
+private rows. Public QR trace functions expose a limited published batch
+journey. See the [direct NGO workflow](DIRECT_NGO_WORKFLOW.md).
 
 ---
 

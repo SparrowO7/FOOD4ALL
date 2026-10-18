@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:db": "node scripts/db-security-test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -18,6 +19,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",

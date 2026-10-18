@@ -15,10 +15,28 @@ export default {
           400: "#fb923c", 500: "#f97316", 600: "#ea580c",
         },
         ink: { 900: "#0f172a", 700: "#334155", 500: "#64748b" },
+
+        // ── Landing-page palette ────────────────────────────────────────
+        // Grounded in Indian enamelware and `anna daan` (food as offering):
+        // deep bottle green for freshness, marigold for the offering, steel
+        // for the tiffin. Chilli is functional only — expiring timers.
+        rescue: {
+          deep: "#06251C",
+          green: "#0C3F2E",
+          moss: "#15543E",
+          marigold: "#F5B312",
+          ember: "#E8921B",
+          steel: "#C9D4CE",
+          paper: "#FBF9F3",
+          chilli: "#E0452C",
+        },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "Segoe UI", "sans-serif"],
+        sans: ["var(--font-archivo)", "Inter", "system-ui", "Segoe UI", "sans-serif"],
         display: ["Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"],
+        // Tall, narrow, high x-height — reads like painted signage at large
+        // sizes. Only used above ~2rem, where its thin strokes hold up.
+        board: ["var(--font-darker)", "Impact", "system-ui", "sans-serif"],
       },
       boxShadow: {
         soft: "0 2px 20px rgba(15,23,42,.06)",

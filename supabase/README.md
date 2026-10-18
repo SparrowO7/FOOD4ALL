@@ -1,7 +1,6 @@
 # Database — apply order
 
-Run these in the Supabase SQL Editor, in this order. Every file is idempotent
-(safe to re-run), so if you are unsure whether something applied, run it again.
+Run migrations in filename order in the Supabase SQL Editor. Record each successful application. Older migrations are NOT safe to replay blindly. Commit 0010a before running 0010b.
 
 | # | File | What it does |
 |---|------|--------------|
@@ -12,7 +11,15 @@ Run these in the Supabase SQL Editor, in this order. Every file is idempotent
 | 5 | `migrations/0005_expiry.sql` | `expire_stale_donations()` + pg_cron schedule (needs the one-click step below) |
 | 6 | `migrations/0006_insert_guard.sql` | Donations may only be inserted as `draft` — closes an impact-inflation hole |
 | 7 | `migrations/0007_privilege_guards.sql` | Closes three privilege-escalation holes (self-registered admin, role self-promotion, NGO self-verification) |
-| 8 | `seed/demo_seed.sql` | Optional: four pre-confirmed demo accounts + two browsable donations |
+| 8 | `migrations/0009_compliance.sql` | Food safety record fields |
+| 9 | `migrations/0010a_rejected_enum.sql` | Add rejected state; commit separately |
+| 10 | `migrations/0010b_rejected_transitions.sql` | Rejection and failure reasons |
+| 11 | `migrations/0011_outcomes.sql` | Attributed outcome annotations |
+| 12 | `migrations/0012_pilot_surface.sql` | Signed-in discovery |
+| 13 | `migrations/0013_public_trace.sql` | Public single-donation QR trace |
+| 14 | `migrations/0014_surplus_register.sql` | Participant register |
+| 15 | `migrations/0015_access_hardening.sql` | Private raw rows, masked discovery, RPC authorization, delivery gate |
+| 16 | `seed/demo_seed.sql` | Optional: four pre-confirmed demo accounts + two browsable donations |
 
 ## Two manual steps in the dashboard
 
@@ -34,7 +41,21 @@ Run these in the Supabase SQL Editor, in this order. Every file is idempotent
    up. The demo accounts in `seed/demo_seed.sql` are confirmed at creation, so
    they log in either way.
 
-## Verifying it all works
+## Local regression tests
+
+Run `npm run test:db`. This creates an isolated in-memory PostgreSQL database,
+applies every migration, and exercises real RLS and functions as different roles.
+It stubs Supabase auth.uid/users and omits the pgcrypto extension (UUID generation
+is built into PostgreSQL). It does not test hosted auth, HTTP, browser rendering,
+concurrent sessions, pg_cron scheduling or deploy anything to Supabase.
+
+**Existing hosted project:** apply only unapplied migrations. 0015 is atomic and
+re-runnable. Deploy 0015 together with the updated UI; donation completion now
+requires a delivery record with actual servings. Backfill old delivered donations
+only using real handover records, never invented values. Verify in a staging
+project before enabling a real public pilot.
+
+## Hosted workflow checks
 
 ```bash
 node scripts/e2e-test.mjs

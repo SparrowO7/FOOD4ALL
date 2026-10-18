@@ -6,7 +6,128 @@
 
 :root { --bg: #f8fafc; }
 html, body { height: 100%; }
-body { font-family: Inter, system-ui, sans-serif; background: var(--bg); }
+/* Uses the next/font variable set in layout.tsx. Kept as a `body` rule (not a
+   utility) so every page inherits it, with Inter still listed as the fallback
+   for anything that loads before the font does. */
+body { font-family: var(--font-archivo), Inter, system-ui, sans-serif; background: var(--bg); }
+
+/* ---------------------------------------------------------------------------
+   Landing page
+
+   The app shell wraps every page in `max-w-6xl px-4`. The landing hero needs
+   to reach the viewport edge, so `.bleed` cancels the container's width by
+   pushing its margins out to the window. `overflow-x: clip` on html stops the
+   1-scrollbar-width overshoot from creating a horizontal scrollbar; `clip`
+   rather than `hidden` because `hidden` would break `position: sticky` on the
+   navbar.
+--------------------------------------------------------------------------- */
+html { overflow-x: clip; }
+
+.bleed {
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* Countdown digits must not change width as they tick, or the whole row
+   jitters once a second. This is why the board needs no monospace face. */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* Marigold focus ring, legible against both the deep green and the paper
+   sections. The default browser outline disappears on the dark field. */
+.on-deep :focus-visible,
+.on-deep:focus-visible {
+  outline: 2px solid #F5B312;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Living background
+
+   Three soft radial glows that drift behind the hero. Deliberately cheap:
+   only `transform` is animated, so the compositor runs it on the GPU with no
+   repaint and no layout. There is no `filter: blur()` and no `backdrop-filter`
+   over a large area — those are what make this effect stutter in Chrome. The
+   gradients are already soft, so no blur is needed to begin with.
+--------------------------------------------------------------------------- */
+.field { position: relative; isolation: isolate; overflow: hidden; }
+.field > .field-content { position: relative; z-index: 1; }
+
+.drift {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  will-change: transform;
+  /* Promote once, up front, instead of mid-animation. */
+  transform: translateZ(0);
+}
+
+@keyframes drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(5%, -4%, 0) scale(1.09); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.04); }
+  50%      { transform: translate3d(-6%, 5%, 0) scale(1); }
+}
+@keyframes drift-c {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(3%, 6%, 0); }
+}
+
+.drift-a { animation: drift-a 24s ease-in-out infinite; }
+.drift-b { animation: drift-b 31s ease-in-out infinite; }
+.drift-c { animation: drift-c 27s ease-in-out infinite; }
+
+/* ---------------------------------------------------------------------------
+   Buttons
+
+   `.btn-cursor` tracks the pointer inside the button: a client component
+   writes --mx/--my, and the highlight below reads them. No React state is
+   involved, so moving the mouse costs two custom-property writes and a
+   composited paint of one element — not a re-render.
+--------------------------------------------------------------------------- */
+.btn-cursor {
+  position: relative;
+  overflow: hidden;
+  transition: transform .16s cubic-bezier(.2, .7, .3, 1), box-shadow .16s ease;
+}
+.btn-cursor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s ease;
+  background: radial-gradient(
+    120px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, .34),
+    transparent 62%
+  );
+}
+.btn-cursor:hover::after { opacity: 1; }
+.btn-cursor:hover { transform: translateY(-2px); }
+/* Press returns it to the resting plane — the click should feel like contact. */
+.btn-cursor:active { transform: translateY(0); }
+
+/* On a dark button the white highlight works; on marigold it would wash out,
+   so that variant darkens instead. */
+.btn-cursor-dark::after {
+  background: radial-gradient(
+    120px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(6, 37, 28, .22),
+    transparent 62%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none !important; }
+  .drift { animation: none !important; }
+  .btn-cursor { transition: none; }
+  .btn-cursor:hover { transform: none; }
+}
+
+html.dark { color-scheme: dark; }
 
 /* premium premium */
 .glass { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
@@ -62,3 +183,42 @@ html.dark { color-scheme: dark; }
   border-bottom-color: rgba(255, 255, 255, .12);
 }
 .dark .leaflet-bar a:hover { background: #334155; }
+
+/* Food4All India — warm editorial interface. Scoped landing styles keep task forms intact. */
+.premium-bg { background: #faf9f5; }
+.dark .premium-bg { background: #101e19; }
+.home-refresh { --food-ink:#203b2c; --food-muted:#6b7469; --food-paper:#faf9f5; color:var(--food-ink); }
+.dark .home-refresh { --food-ink:#edf2e8; --food-muted:#b2bdb1; --food-paper:#101e19; }
+.eyebrow { font-size:10px; letter-spacing:.16em; font-weight:700; display:inline-flex; align-items:center; gap:9px; }
+.green-dot { width:7px; height:7px; border-radius:50%; background:#7d9c56; }
+.food-hero { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:48px; padding:46px 0 58px; }
+.hero-story h1 { font-size:clamp(44px,5.8vw,76px); line-height:1.04; letter-spacing:-.065em; font-weight:600; margin:24px 0; }
+.home-refresh em { font-family:Georgia,serif; font-weight:400; color:#708447; letter-spacing:-.055em; }
+.hero-story>p { max-width:410px; font-size:15px; line-height:1.8; color:var(--food-muted); }
+.hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:28px; }
+.food-button { display:inline-flex; align-items:center; justify-content:space-between; gap:30px; border-radius:9px; padding:15px 23px; font-size:13px; font-weight:600; transition:transform .18s,background .18s; }
+.food-button:hover { transform:translateY(-2px); }
+.food-button.primary { background:#274a35; color:#fff; }
+.food-button.primary:hover { background:#376446; }
+.food-button.secondary { border:1px solid #cfd3c7; color:var(--food-ink); }
+.food-button span { font-size:20px; line-height:1; }
+.hero-footnote { display:flex; gap:12px; align-items:center; color:var(--food-muted); font-size:10px; line-height:1.8; margin-top:28px; }
+.hero-footnote strong { font-weight:400; }
+.mini-heart { background:#eeeede; width:35px; height:35px; display:grid; place-items:center; color:#426044; border-radius:50%; font-size:25px; }
+.hero-photo-wrap { position:relative; padding:0 12px 26px 0; }
+.hero-food-photo { height:480px; width:100%; object-fit:cover; border-radius:140px 14px 14px 14px; }
+.photo-caption { position:absolute; top:25px; right:30px; font-size:8px; letter-spacing:.13em; background:#faf9f5e8; border-radius:30px; padding:9px 13px; color:#294333; }
+.meal-note { position:absolute; bottom:0; left:-25px; display:flex; align-items:center; gap:13px; background:#fffdf6; color:#294333; padding:19px 24px; border:1px solid #e8e7db; border-radius:13px; box-shadow:0 12px 35px #243d2510; }
+.meal-note-icon { background:#edf0de; width:42px; height:42px; border-radius:50%; display:grid; place-items:center; font-size:24px; }
+.meal-note strong { font-size:13px; }.meal-note p { font-size:10px; margin-top:5px; color:#737b6b; }
+.hero-stamp { position:absolute; bottom:65px; right:-10px; height:113px; width:113px; border-radius:50%; background:#edecad; color:#3c4e2f; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(10deg); font-size:12px; line-height:1.35; border:5px solid var(--food-paper); }.hero-stamp span{font-size:27px;}
+.values-strip { display:flex; align-items:center; justify-content:space-around; gap:12px; padding:23px 10px; border-top:1px solid #8e9b822b; border-bottom:1px solid #8e9b822b; font-size:12px; }.values-strip>span:nth-child(even){color:#8a9b67;font-size:21px;}
+.home-section { padding:76px 0; }.section-heading{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:30px;}
+.home-refresh h2 {font-size:clamp(30px,3.7vw,45px);line-height:1.14;letter-spacing:-.045em;font-weight:500;margin-top:15px;}.section-heading>p{font-size:13px;line-height:1.8;color:var(--food-muted);}
+.journey-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}.journey-card{padding:27px;border-radius:14px;color:#263e2c;}.peach{background:#f2e7dc;}.sage{background:#e7ecdf;}.sand{background:#eeeddf;}.journey-top{display:flex;align-items:center;justify-content:space-between;color:#71816a;font-size:11px;}.journey-icon{width:42px;height:42px;display:grid;place-items:center;border:1px solid #6c7c5933;border-radius:50%;font-size:26px;}.journey-card h3{font-size:19px;letter-spacing:-.04em;margin:26px 0 12px;font-weight:600;}.journey-card p{font-size:12px;line-height:1.85;color:#64705f;}.journey-card a{display:flex;justify-content:space-between;border-top:1px solid #6b795e22;margin-top:27px;padding-top:17px;font-size:12px;font-weight:600;}
+.purpose-section{display:grid;grid-template-columns:1fr 1fr;gap:65px;align-items:center;padding:5px 0 70px;}.purpose-visual{position:relative;}.purpose-visual img{width:100%;height:380px;object-fit:cover;border-radius:14px;}.purpose-label{position:absolute;bottom:22px;left:20px;background:#fffdf4;color:#32472f;padding:13px 18px;font-family:Georgia,serif;font-style:italic;font-size:19px;border-radius:6px;}.purpose-copy>p{font-size:13px;line-height:1.9;color:var(--food-muted);margin-top:17px;}.purpose-copy .food-button{margin-top:25px;}.care-detail{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;font-size:9px;color:var(--food-muted);}
+.impact-ribbon{background:#e9edde;border-radius:14px;padding:30px 35px;color:#29412e;display:flex;align-items:center;justify-content:space-between;gap:24px;}.impact-ribbon h2{font-size:29px;margin:8px 0 12px;}.impact-ribbon a{font-size:11px;text-decoration:underline;text-underline-offset:4px;}.impact-numbers{display:flex;gap:45px;}.impact-numbers strong{display:block;font-size:42px;font-weight:500;letter-spacing:-.05em;}.impact-numbers span{font-size:10px;}.impact-unavailable{font-size:12px;line-height:1.8;}
+.closing-invite{text-align:center;padding:80px 0 50px;}.closing-invite h2{font-size:clamp(40px,5vw,62px);}.closing-invite .food-button{margin-top:25px;}.closing-invite>p{font-size:11px;color:var(--food-muted);margin-top:19px;}.closing-invite>p a{text-decoration:underline;text-underline-offset:3px;}.editorial-credit{text-align:center;font-size:9px;color:var(--food-muted);padding-bottom:12px;}
+.food-nav { background:#faf9f5ed; border-bottom:1px solid #8e9b8225; }.dark .food-nav {background:#101e19ed;}.food-nav a:focus-visible,.home-refresh a:focus-visible {outline:2px solid #78964e;outline-offset:5px;}.food-footer {background:#e9ecdf;color:#334834;}.dark .food-footer{background:#182a20;color:#dce5d7;}
+@media(max-width:767px){.food-hero{grid-template-columns:1fr;gap:35px;padding:28px 0 34px;}.hero-story h1{font-size:56px;}.hero-photo-wrap{margin-left:15px;}.hero-food-photo{height:360px;border-top-left-radius:100px;}.meal-note{left:-12px;padding:15px;}.hero-stamp{right:0;bottom:55px;width:95px;height:95px;}.hero-footnote{margin-top:20px;}.values-strip{font-size:9px;gap:8px;text-align:center;}.section-heading{display:block;}.section-heading>p{margin-top:20px;}.home-section{padding:44px 0;}.journey-grid{grid-template-columns:1fr;}.journey-card{padding:23px;}.journey-card h3{margin-top:18px;}.purpose-section{grid-template-columns:1fr;gap:30px;padding-bottom:40px;}.purpose-visual img{height:300px;}.impact-ribbon{display:block;padding:25px;}.impact-numbers{justify-content:space-between;gap:10px;margin-top:25px;}.impact-numbers strong{font-size:34px;}.impact-numbers span{font-size:9px;}.impact-unavailable{margin-top:18px;}.closing-invite{padding:50px 0 35px;}}
+@media(prefers-reduced-motion:reduce){.food-button{transition:none;}.food-button:hover{transform:none;}}

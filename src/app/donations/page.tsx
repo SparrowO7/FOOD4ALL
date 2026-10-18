@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { signedMediaUrlMap } from '@/lib/media';
 import StatusBadge from '@/components/StatusBadge';
 import FoodTypeBadge from '@/components/FoodTypeBadge';
 import type { Donation } from '@/types/database';
@@ -11,10 +12,15 @@ export default async function DonationsPage({
 }) {
   const params = await searchParams;
   const supabase = await createClient();
-  let q = supabase.from('donations_public').select('*').order('created_at', { ascending: false }).limit(50);
+  const { data: { user } } = await supabase.auth.getUser();
+  let q = supabase.from('donations_public').select('*').neq('food_type','nonveg').order('created_at', { ascending: false }).limit(50);
   if (params.status) q = q.eq('status', params.status);
   if (params.food_type) q = q.eq('food_type', params.food_type);
-  const { data, error } = await q;
+  const { data, error } = user ? await q : { data: null, error: null };
+
+  // One batched call for the whole page rather than a signed URL per card.
+  const rows = (data ?? []) as Donation[];
+  const photoUrls = await signedMediaUrlMap(supabase, 'donation', rows.map((d) => d.photo_url));
 
   const activeFilter = params.status ?? params.food_type ?? '';
 
@@ -22,8 +28,8 @@ export default async function DonationsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight dark:text-white">Donations</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Privacy-masked until claimed/assigned · State machine enforced</p>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight dark:text-white">Good food, ready to share.</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Vegetarian food only. Explore available food and help it reach your community.</p>
         </div>
         <Link href="/donations/new" className="rounded-full bg-brand-600 px-6 py-3 text-sm font-extrabold text-white shadow-soft hover:bg-brand-700">
           + New donation
@@ -37,7 +43,6 @@ export default async function DonationsPage({
           { label: 'Claimed', href: '/donations?status=claimed', active: params.status === 'claimed' },
           { label: 'Pickup scheduled', href: '/donations?status=pickup_scheduled', active: params.status === 'pickup_scheduled' },
           { label: 'Veg', href: '/donations?food_type=veg', active: params.food_type === 'veg' },
-          { label: 'Non-Veg', href: '/donations?food_type=nonveg', active: params.food_type === 'nonveg' },
         ].map((f) => (
           <Link
             key={f.href}
@@ -49,20 +54,30 @@ export default async function DonationsPage({
         ))}
       </div>
 
-      {error && <p className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">{error.message}</p>}
-      {!data?.length && !error && (
+      {!user && <div className="rounded-2xl border border-[#dce2cf] bg-[#e9edde] p-8 text-[#29412e]"><p className="text-lg font-semibold">A little connection goes a long way.</p><p className="mt-2 max-w-lg text-sm leading-7">Sign in to see donation listings. Pickup details are shared only with the people coordinating each handover.</p><Link href="/auth/login" className="mt-5 inline-flex rounded-lg bg-[#294b35] px-5 py-3 text-sm font-semibold text-white">Sign in to find food →</Link></div>}
+      {error && <p className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">We couldn’t load the food listings. Please refresh and try again.</p>}
+      {user && !data?.length && !error && (
         <div className="rounded-[20px] border border-dashed bg-white p-10 text-center shadow-soft dark:border-white/15 dark:bg-slate-900/60">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">🍱</div>
           <p className="mt-3 font-bold dark:text-white">No donations yet</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">Create one to get started — donors publish, NGOs claim, volunteers deliver. Demo tip: publish with a future <code>best_before</code>.</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">Nothing matches this view yet. Try another filter, or share food with your community.</p>
           <Link href="/donations/new" className="mt-4 inline-flex rounded-full bg-brand-600 px-5 py-2.5 text-sm font-extrabold text-white hover:bg-brand-700">Create donation</Link>
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(data as Donation[] | null)?.map((d) => (
+        {rows.map((d) => (
           <Link key={d.id} href={`/donations/${d.id}`} className="group relative overflow-hidden rounded-[20px] border bg-white p-5 shadow-soft transition hover:shadow-card dark:border-white/10 dark:bg-slate-900/60">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-600 to-emerald-600 opacity-80" />
+            {/* A food photo is the fastest signal on a listing page, so it goes
+                above the text. Signed server-side; absent if the viewer may not
+                see this bucket object. */}
+            {photoUrls.get(d.photo_url ?? '') && (
+              <div className="-mx-5 -mt-5 mb-4 h-40 overflow-hidden bg-slate-100 dark:bg-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoUrls.get(d.photo_url ?? '')} alt={`Photo of ${d.title}`} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <FoodTypeBadge type={d.food_type as never} />
               <StatusBadge status={d.status as never} />

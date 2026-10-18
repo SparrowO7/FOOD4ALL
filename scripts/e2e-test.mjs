@@ -127,6 +127,8 @@ try {
     description: 'Automated lifecycle test donation.',
     food_type: 'veg',
     is_cooked: true,
+    vegetarian_confirmed: true,
+    not_previously_served: true,
     quantity_desc: '40 thalis in 2 trays',
     servings_estimate: 40,
     prepared_at: iso(-30 * 60 * 1000),
@@ -182,7 +184,9 @@ try {
   await hop(vol, 'pickup_scheduled', 'volunteer self-accepts');
   await hop(vol, 'picked_up', 'volunteer marks picked up');
 
-  // delivery proof row, then the delivered transition
+  await hop(vol, 'delivered', 'volunteer marks delivered');
+
+  // Record actual servings after handover, before NGO confirmation.
   const { error: delErr } = await vol.supabase.from('deliveries').insert({
     donation_id: id,
     volunteer_id: vol.user.id,
@@ -193,7 +197,6 @@ try {
   delErr ? bad('deliveries row insert', delErr.message.split('\n')[0])
          : ok('deliveries row inserted', '38 servings');
 
-  await hop(vol, 'delivered', 'volunteer marks delivered');
   await hop(ngo, 'completed', 'ngo confirms receipt');
 
   // 6. audit trail

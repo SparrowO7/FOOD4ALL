@@ -27,7 +27,7 @@ Yeh ek *reference manual* nahi hai — yeh ek *learning doc* hai. Har jagah teen
 | **7** | Auto-expiry (cron) |
 | **8** | Food safety / FSSAI alignment |
 | **9** | Frontend architecture |
-| **10** | Testing — 26 assertions kya prove karti hain |
+| **10** | Testing — 27 assertions kya prove karti hain |
 | **11** | Cost sheet — sab kuch ₹0 mein |
 | **12** | Abhi bhi kya missing hai (honest list) |
 | **13** | Viva / interview Q&A |
@@ -118,7 +118,7 @@ Yeh sab bhi chahiye hota hai, aur inhi mein time jaata hai:
 | Migrations | `supabase/migrations/0001…0007` |
 | Background job | `pg_cron` har 10 min |
 | File storage | Supabase Storage (abhi URL field, upload Phase 3) |
-| Testing | `scripts/e2e-test.mjs` — 26 assertions |
+| Testing | `scripts/e2e-test.mjs` — 27 assertions |
 
 Ek line mein pakad lo yeh baat, yahi is project ka central idea hai:
 
@@ -396,6 +396,21 @@ https://www.google.com/maps/dir/?api=1&destination=<lat>,<lng>
 **Honest limitation:** India ke addresses Nominatim pe kamzor hain. "Plot 7, near Shiv Mandir, Sector 12" — isko woh nahi dhoondh paayega. Isiliye design mein **manual map pin** ko primary rakha hai, geocoding ko sirf *helper* — "shayad aapka matlab yeh hai?"
 
 > **Yeh ek design lesson hai:** jab tool kamzor ho, to usko *suggestion* banao, *source of truth* nahi.
+
+### Nominatim ko browser se seedha kyun nahi bulaya
+
+`/api/geocode` ek apna server-side proxy hai. Chaar wajah:
+
+1. **Browser `User-Agent` header set hi nahi kar sakta** — woh "forbidden header" hai, browser use chupke se apne naam se overwrite kar deta hai. Nominatim ki policy app-identifying User-Agent maangti hai. Matlab **policy follow karna browser se technically possible hi nahi** — sirf server kar sakta hai.
+2. **1 req/sec limit sach mein enforce ho sakti hai.** 10 browser tabs mein se har ek "main polite hoon" sochega aur phir bhi 10 req/sec chale jaayenge. Ek server-side gate hi asli gate hai.
+3. **Cache** — wahi query dobara aaye to upstream call hi nahi jaati.
+4. **Geocoder swap ek file ka kaam** — browser ko pata hi nahi chalta ki peeche Nominatim hai. Kal paid geocoder lagana ho to sirf proxy badlega.
+
+```ts
+const MIN_GAP_MS = 1100;   // policy 1/sec + 100ms headroom
+```
+
+> **Honest limitation:** yeh gate ek instance ki memory mein hai. Vercel N serverless instances chala de to N req/sec ho sakta hai. Asli fix = shared store (Upstash Redis) ya paid geocoder. Yeh gap PART 12 mein likha hai.
 
 ---
 
@@ -1804,7 +1819,7 @@ Anonymous user ko dikhta hai: title, status, timeline, kitne meals pahunche — 
 
 ---
 
-# PART 10 — Testing: 26 assertions kya prove karti hain
+# PART 10 — Testing: 27 assertions kya prove karti hain
 
 > File: `scripts/e2e-test.mjs` (352 lines)
 
@@ -1844,12 +1859,12 @@ const supabase = createClient(URL, ANON_KEY);   // service key NAHI
 | 10 | `status:'completed'` insert | **Hole 1 band** |
 | 11 | `role:'admin'` update | **Hole 3 band** |
 | 12 | Self-verify try | **Hole 4 band** |
-| 13 | Signup with `role:'admin'` | Hole 2 band — ⏭️ **skip ho gaya** |
+| 13 | Signup with `role:'admin'` | **Hole 2 band** — request donor pe clamp hui |
 | 14 | Expiry sweep | Cron logic + NULL actor |
 
 **Final result:**
 ```
-26 passed · 0 failed · 1 skipped
+27 passed · 0 failed · 0 skipped
 ```
 
 **Asli outputs:**
@@ -1864,24 +1879,43 @@ const supabase = createClient(URL, ANON_KEY);   // service key NAHI
 ✓ new row violates row-level security policy for table "donations"
 ✓ Only an admin can change a user role
 ✓ Only an admin can change NGO verification
+✓ Signup with role:'admin' → profile mein role = 'donor' (clamp hua)
 ✓ Expiry sweep: 1 donation expired, audit row with actor_id = null
 ```
 
-## 10.4 Step 13 skip kyun hua — aur ise chhupaya kyun nahi
+## 10.4 Step 13 pehle skip hota tha — aur woh kahani poori likhi hai
+
+Bahut samay tak output aisa aata tha:
 
 ```
 ⏭  SKIPPED: email rate limit exceeded
 ```
 
-**Wajah:** Supabase free tier ~2 emails/hour deta hai. Step 13 ko naya user signup karna tha. "Confirm email" setting abhi bhi **ON** hai, to signup email bhejne ki koshish karta hai → rate limit.
+**Wajah:** Supabase free tier ~2 emails/hour deta hai. Step 13 ko ek naya user signup karna padta hai. Dashboard mein **"Confirm email" ON** tha, to har signup email bhejne ki koshish karta → rate limit → test chal hi nahi paata.
 
-**Verify karne ka alag tareeka** (function ka source hi padh lo):
+**Us waqt humne do cheezein ki:**
+
+1. Report mein `26/26 pass` **nahi likha**. Likha `26 passed · 1 skipped`.
+2. Fix ka alag rasta bhi document kiya — function ka source seedha padh lo:
+
 ```sql
 select prosrc from pg_proc where proname = 'handle_new_user';
 -- allowlist CASE dikh jaayega
 ```
 
-> **Yeh likhna zaroori kyun hai:** report mein "26/26 pass" likh dena aasaan tha. Lekin **ek skipped test ko pass bolna** engineering mein sabse buri aadat hai. Viva mein examiner yahi poochega — "kya koi cheez verify nahi hui?" — aur uska saaf jawab hona `100% pass` se zyada impressive hai.
+**Phir asli fix hua.** Dashboard mein Authentication → Sign In / Providers → **User Signups** → "Confirm email" **OFF**. (Setting ka internal naam `mailer_autoconfirm` hai, aur uska naam ulta hai — `true` ka matlab "confirmation chahiye hi nahi".)
+
+Ab step 13 sach mein chalta hai:
+
+```
+✓ admin request clamped to donor
+```
+
+> **Lesson jo yahan chhupa hai:** `26/26 pass` likh dena aasaan tha — ek line badalni thi. Lekin **skipped test ko pass bolna** engineering ki sabse buri aadat hai, kyunki tab aap khud ko hi dhokha dete ho: Hole 2 ka fix sirf *maana* ja raha tha, *prove* nahi hua tha.
+>
+> Imaandari se "skipped" likhne ka inaam yeh mila ki woh gap list mein zinda raha, aur ek din band ho gaya. Agar chhupa diya hota, to aaj bhi khula hota — aur viva mein examiner ke poochne par pata chalta.
+
+**Viva mein yeh poocha jaayega:** *"Kya koi cheez verify nahi hui?"* — ab jawab hai **"ab sab verified hai, aur pehle jo nahi tha woh bhi likha hua hai."** Woh `100% pass` se zyada strong jawab hai.
 
 ## 10.5 Test mein ek sundar detail — clean-up
 
@@ -1949,23 +1983,37 @@ Aur `auth.identities` ka insert `where not exists` se guard kiya (constraint ka 
 
 > **Yeh section jaanbujh ke likha hai.** Viva mein examiner gaps dhoondhega. Agar aapne pehle hi list bana rakhi hai, to aap defensive nahi, **aware** dikhte ho.
 
+## 12.1 Jo gaps band ho gaye ✅
+
+Yeh list isliye rakhi hai ki progress dikhe — aur isliye bhi ki jo likha tha woh sach mein hua, bhula nahi diya gaya.
+
+| Purana gap | Kya kiya | Proof |
+|---|---|---|
+| **Map picker nahi tha** — form mein lat/lng manually type karna padta | `MapPicker.tsx` (Leaflet + OSM, search + "use my location" + drag pin) aur `LocationMap.tsx` (detail page). Geocoding ke liye apna `/api/geocode` proxy | Landing page ka "no paid map APIs" claim ab sach mein demo hota hai |
+| **Confirm email ON tha** — test step 13 skip | Dashboard mein OFF (`mailer_autoconfirm: true`) | `27 passed · 0 skipped` |
+| **Git mein zero commits** | Commit + push → `github.com/SparrowO7/FOOD4ALL` (public) | Commit `0e5d32e`, 60 files |
+
+> Map banate waqt ek **chhupa hua bug** bhi mila: `Number(null) === 0` aur `Number('') === 0`, aur `isFinite(0)` bhi `true` hai. Matlab **missing coordinate `0,0` ban ke save ho jaata tha** — jo Atlantic Ocean mein ek asli jagah hai, Ghana ke neeche. HTML ka `required` ise chhupa raha tha. Fix: `parseCoord()` absence ko explicitly reject karta hai. Yeh ab Hole 7 hai.
+
+## 12.2 Jo abhi bhi khule hain
+
 | # | Gap | Impact | Effort |
 |---|---|---|---|
-| 1 | **Map picker nahi bana** — form mein lat/lng manually | 🔴 Zyada — landing page "no paid map APIs" claim karta hai, dikhana chahiye | 1-2 din |
-| 2 | **Confirm email ON hai** — test step 13 skip | 🟡 Medium — demo se pehle OFF karna hai | 2 minute |
-| 3 | **Photo upload nahi** — sirf URL field | 🟡 Medium — proof photo safety ke liye matter karta hai | 1 din |
-| 4 | **Notifications nahi** | 🟡 Medium — user ko khud check karna padta | Phase 3 |
-| 5 | **Git mein zero commits** (`.git` hai, commit nahi) | 🟡 Medium — version history nahi | 10 minute |
-| 6 | **`total_pickups` self-writable** | 🟢 Kam — cosmetic, documented hai | 30 minute |
-| 7 | **Geo index 2D nahi** | 🟢 Kam — abhi scale pe nahi | Phase 3 |
-| 8 | **5 Phase-2 open decisions settle nahi** | 🟡 Medium | Discussion |
-| 9 | **Realtime use nahi kiya** — Supabase deta hai, lagaya nahi | 🟢 Kam — live status achha dikhta | 1 din |
+| 1 | **Map browser mein visually verify nahi hua** — build, types, API sab pass, par tiles sach mein paint ho rahe hain yeh kisi ne aankh se dekha nahi | 🔴 Zyada — demo se pehle 2 minute ka kaam, par abhi "assumed working" hai | 2 minute |
+| 2 | **Photo upload nahi** — sirf URL field, Supabase Storage bucket banana baaki | 🟡 Medium — proof photo safety ke liye matter karta hai | 1 din |
+| 3 | **Notifications nahi** — NGO ko khud app kholna padta hai | 🟡 Medium — asli deployment mein yeh sabse bada operational gap | Phase 3 |
+| 4 | **5 Phase-2 open decisions settle nahi** | 🟡 Medium | Discussion |
+| 5 | **Geocode rate-limit state per-instance memory mein** — N serverless instances = N req/sec, Nominatim policy 1/sec kehti hai | 🟡 Medium — chhote scale pe theek, badhne pe Upstash ya paid geocoder | Half din |
+| 6 | **CI nahi, unit test nahi** — sirf ek e2e script, woh bhi manually chalani padti hai | 🟡 Medium — GitHub Actions pe 1 workflow file | 2 ghante |
+| 7 | **`total_pickups` self-writable** | 🟢 Kam — cosmetic, impact numbers `donations`/`deliveries` se aate hain | 30 minute |
+| 8 | **Geo index 2D nahi** — Haversine + B-tree, PostGIS/GiST nahi | 🟢 Kam — kuch hazaar rows tak theek | Phase 3 |
+| 9 | **Realtime use nahi kiya** — Supabase free mein deta hai, lagaya nahi | 🟢 Kam — live status demo mein achha dikhta | 1 din |
 
 **Priority order agar kal se kaam shuru karo:**
-1. Confirm email OFF (2 min — test poora green ho jaayega)
-2. Git commit (10 min)
-3. Map picker (1-2 din — **sabse zyada visible, demo mein sabse zyada dikhega**)
-4. Photo upload
+1. Map browser mein kholke dekho (2 min — ya to kaam kar raha hai, ya turant pata chal jaayega)
+2. Photo upload (1 din — Storage bucket + RLS policy)
+3. CI workflow (2 ghante — har push pe test apne aap chale)
+4. Notifications (Phase 3 — asli deployment ka blocker)
 
 ---
 
@@ -2050,13 +2098,17 @@ Food4all/
 │   │   └── 0007_privilege_guards.sql Holes 2,3,4 fix
 │   ├── seed/demo_seed.sql           4 pre-confirmed demo users + 2 donations
 │   └── README.md                    apply order + manual steps
-├── scripts/e2e-test.mjs             14 steps, 26 assertions
+├── scripts/e2e-test.mjs             14 steps, 27 assertions
 ├── src/
-│   ├── app/          (14 routes)
-│   ├── components/   (13 components)
+│   ├── app/
+│   │   ├── (11 page routes)
+│   │   └── api/geocode/route.ts     Nominatim proxy (throttle + cache)
+│   ├── components/   (15 components — MapPicker, LocationMap naye)
 │   ├── lib/          actions.ts, haversine.ts, supabase/{client,server}.ts
 │   └── types/database.ts
 ├── middleware.ts                    session refresh
+├── README.md                        public-facing (GitHub landing page)
+├── HANDOFF.md                       naye AI model ko dene ke liye context dump
 ├── Food4All_Phase1_Research.pdf
 ├── Food4All_Phase2_Architecture.md
 └── Food4All_Build_Notes.md          ← yeh file
